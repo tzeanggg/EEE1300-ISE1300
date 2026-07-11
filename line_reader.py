@@ -51,6 +51,9 @@ class PixyPublisher(Node):
         pixy.init()
         pixy.change_prog("line")
 
+        # Turn on the Pixy2's onboard white illumination LEDs (upper, lower)
+        pixy.set_lamp(1, 1)  # 1 = on, 0 = off, for each of the two lamps
+
         # --- Latch & Debounce Variables ---
         self.intersection_latch_time = 0.0
         self.intersection_counter = 0        # NEW: Tracks consecutive frames
@@ -67,8 +70,12 @@ class PixyPublisher(Node):
         barcodes = pixy.BarcodeArray(100)
         intersections = pixy.IntersectionArray(100)
 
-        # Tell the camera to filter out noise and ONLY track the main path
-        pixy.line_get_main_features()
+        # Tell the camera to report ALL feature types (vectors, intersections,
+        # barcodes) every frame. In this SWIG binding, line_get_main_features()
+        # only returns the single "best" feature and takes no arguments to
+        # change that — line_get_all_features() is the separate call needed
+        # to reliably get intersections/barcodes too.
+        pixy.line_get_all_features()
 
         # --- Extract Vectors ---
         v_count = pixy.line_get_vectors(100, vectors)
@@ -81,6 +88,10 @@ class PixyPublisher(Node):
         # --- Extract Intersections ---
         i_count = pixy.line_get_intersections(100, intersections)
         msg_int = Bool()
+
+        self.get_logger().info(
+            f'i_count={i_count} counter={self.intersection_counter}',
+            throttle_duration_sec=0.5)
 
         # NEW DEBOUNCE LOGIC: Filter out false positives
         if i_count > 0:
